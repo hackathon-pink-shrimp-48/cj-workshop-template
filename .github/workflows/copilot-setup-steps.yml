@@ -1,0 +1,57 @@
+name: Copilot Setup Steps
+
+# GitHub Copilot 코딩 에이전트(= cloud agent)가 도는 일회성 환경을 사전 선언한다.
+# 잡 이름은 반드시 `copilot-setup-steps` — 에이전트가 이 잡을 찾아 환경을 부트스트랩한다.
+# 여기서 의존성·도구를 미리 깔아 두면 위임 세션마다 같은 환경이 재현된다(결정론).
+# 자동 실행이 아니라 위임 세션이 시작될 때 호출되므로 트리거는 workflow_dispatch.
+#
+# 이 파일은 "드롭인 템플릿"이다 — clone한 repo의 스택에 맞춰 필요한 줄만 남기고 나머지는 지운다.
+# 아래는 Python / Node 둘 다 자동 감지하는 안전한 기본값이다(둘 중 없으면 그 단계는 건너뛴다).
+# 배포 인프라(레지스트리 로그인·클라우드 자격증명 등)는 의도적으로 넣지 않았다 — 데모는 merge에서 끝난다.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- Python (requirements.txt 또는 pyproject.toml 이 있으면) ---
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install python deps
+        run: |
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          elif [ -f pyproject.toml ]; then
+            pip install -e . || pip install .
+          else
+            echo "no python manifest — skip"
+          fi
+
+      # --- Node (package.json 이 있으면) ---
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: install node deps
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif [ -f package.json ]; then
+            npm install
+          else
+            echo "no node manifest — skip"
+          fi
+
+      # --- 게이트 도구 자가 점검(선택) ---
+      # gate.sh 가 의존하는 lint/test 러너를 여기서 미리 깔아두면 cloud agent 가
+      # 완료 게이트를 바로 돌릴 수 있다. 실제 명령은 repo 스택에 맞춰 채운다.
+      - name: gate tools (optional)
+        run: |
+          echo "fill in: e.g. pip install ruff pytest  |  npm i -D eslint vitest"
